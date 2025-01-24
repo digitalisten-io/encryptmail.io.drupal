@@ -17,6 +17,13 @@ class Encryptor {
   protected $loggerFactory;
 
   /**
+   * The GnuPG instance.
+   *
+   * @var \gnupg|null
+   */
+  protected $gnupg = NULL;
+
+  /**
    * Constructs a new Encryptor object.
    *
    * @param \Drupal\Core\Logger\LoggerChannelFactoryInterface $logger_factory
@@ -24,6 +31,10 @@ class Encryptor {
    */
   public function __construct(LoggerChannelFactoryInterface $logger_factory) {
     $this->loggerFactory = $logger_factory;
+    // Initialize GnuPG if the extension is available.
+    if (extension_loaded('gnupg')) {
+      $this->gnupg = new \gnupg();
+    }
   }
 
   /**
@@ -70,40 +81,70 @@ class Encryptor {
    *   If encryption fails.
    */
   protected function encryptSmime(string $message, string $certificate): string {
-    // Create a temporary file for the message.
-    $messageFile = $this->createTempFile($message);
-    $certFile = $this->createTempFile($certificate);
-    $outputFile = tempnam(sys_get_temp_dir(), 'encrypted_');
-
     try {
-      // Encrypt using OpenSSL.
-      $command = sprintf(
-        'openssl smime -encrypt -aes256 -in %s -out %s %s',
-        escapeshellarg($messageFile),
-        escapeshellarg($outputFile),
-        escapeshellarg($certFile)
+      // Verify certificate.
+      $cert = openssl_x509_read($certificate);
+      if (!$cert) {
+        throw new \Exception('Invalid certificate: ' . openssl_error_string());
+      }
+
+      // Create temporary files.
+      $infile = tempnam(sys_get_temp_dir(), 'msg');
+      $outfile = tempnam(sys_get_temp_dir(), 'enc');
+
+      // Create MIME message.
+      $mime_message = "MIME-Version: 1.0\n";
+      $mime_message .= "Content-Type: text/plain; charset=UTF-8\n";
+      $mime_message .= "Content-Transfer-Encoding: 7bit\n\n";
+      $mime_message .= $message;
+
+      // Write message to temporary file.
+      file_put_contents($infile, $mime_message);
+
+      // Encrypt using S/MIME.
+      $result = openssl_pkcs7_encrypt(
+        $infile,
+        $outfile,
+        $certificate,
+      // Empty headers array.
+        [],
+      // Use both flags.
+        PKCS7_BINARY | PKCS7_DETACHED,
+        OPENSSL_CIPHER_AES_256_CBC
       );
 
-      $output = [];
-      $returnVar = 0;
-      exec($command, $output, $returnVar);
-
-      if ($returnVar !== 0) {
-        throw new \Exception('S/MIME encryption failed: ' . implode("\n", $output));
+      if (!$result) {
+        throw new \Exception('Encryption failed: ' . openssl_error_string());
       }
 
-      $encrypted = file_get_contents($outputFile);
+      // Read encrypted content.
+      $encrypted = file_get_contents($outfile);
       if ($encrypted === FALSE) {
-        throw new \Exception('Failed to read encrypted message');
+        throw new \Exception('Failed to read encrypted content');
       }
 
-      return $encrypted;
+      // Clean up.
+      unlink($infile);
+      unlink($outfile);
+      if ($cert) {
+        @openssl_x509_free($cert);
+      }
+
+      // Format the encrypted message with proper MIME headers.
+      $formatted = "MIME-Version: 1.0\n";
+      $formatted .= "Content-Type: application/x-pkcs7-mime; protocol=\"application/x-pkcs7-mime\"; smimetype=enveloped-data; name=\"smime.p7m\"\n";
+      $formatted .= "Content-Transfer-Encoding: base64\n";
+      $formatted .= "Content-Disposition: attachment; filename=\"smime.p7m\"\n\n";
+      $formatted .= chunk_split(base64_encode($encrypted));
+
+      return $formatted;
     }
-    finally {
-      // Clean up temporary files.
-      @unlink($messageFile);
-      @unlink($certFile);
-      @unlink($outputFile);
+    catch (\Exception $e) {
+      $this->loggerFactory->get('encryptmailio')->error(
+        'S/MIME encryption error: @error',
+        ['@error' => $e->getMessage()]
+      );
+      throw $e;
     }
   }
 
@@ -122,95 +163,57 @@ class Encryptor {
    *   If encryption fails.
    */
   protected function encryptPgp(string $message, string $public_key): string {
-    // Create temporary files for the message and key.
-    $messageFile = $this->createTempFile($message);
-    $keyFile = $this->createTempFile($public_key);
-    $outputFile = tempnam(sys_get_temp_dir(), 'encrypted_');
+    if (!extension_loaded('gnupg')) {
+      throw new \Exception('GnuPG extension is not installed');
+    }
 
     try {
       // Import the public key.
-      $importCommand = sprintf(
-        'gpg --batch --import %s 2>&1',
-        escapeshellarg($keyFile)
-      );
-      exec($importCommand);
-
-      // Get the key ID from the imported key.
-      $listCommand = sprintf(
-        'gpg --with-colons --list-keys --with-fingerprint < %s',
-        escapeshellarg($keyFile)
-      );
-      $keyInfo = [];
-      exec($listCommand, $keyInfo);
-
-      // Extract the key ID from the output.
-      $keyId = '';
-      foreach ($keyInfo as $line) {
-        if (strpos($line, 'pub:') === 0) {
-          $parts = explode(':', $line);
-          $keyId = $parts[4];
-          break;
-        }
+      $keyInfo = $this->gnupg->import($public_key);
+      if (empty($keyInfo['fingerprint'])) {
+        throw new \Exception('Failed to import PGP public key');
       }
 
-      if (empty($keyId)) {
-        throw new \Exception('Could not determine PGP key ID');
-      }
+      // Add the key for encryption.
+      $this->gnupg->addencryptkey($keyInfo['fingerprint']);
 
       // Encrypt the message.
-      $command = sprintf(
-        'gpg --batch --trust-model always --encrypt --recipient %s --output %s %s 2>&1',
-        escapeshellarg($keyId),
-        escapeshellarg($outputFile),
-        escapeshellarg($messageFile)
-      );
-
-      $output = [];
-      $returnVar = 0;
-      exec($command, $output, $returnVar);
-
-      if ($returnVar !== 0) {
-        throw new \Exception('PGP encryption failed: ' . implode("\n", $output));
-      }
-
-      $encrypted = file_get_contents($outputFile);
+      $encrypted = $this->gnupg->encrypt($message);
       if ($encrypted === FALSE) {
-        throw new \Exception('Failed to read encrypted message');
+        throw new \Exception('PGP encryption failed');
       }
+
+      // Clear the encryption keys.
+      $this->gnupg->clearencryptkeys();
 
       return $encrypted;
     }
-    finally {
-      // Clean up temporary files.
-      @unlink($messageFile);
-      @unlink($keyFile);
-      @unlink($outputFile);
+    catch (\Exception $e) {
+      $this->loggerFactory->get('encryptmailio')->error(
+        'PGP encryption error: @error',
+        ['@error' => $e->getMessage()]
+      );
+      throw $e;
     }
   }
 
   /**
-   * Creates a temporary file with the given content.
+   * Removes MIME headers from content, keeping only the body.
    *
    * @param string $content
-   *   The content to write to the file.
+   *   The content containing MIME headers.
    *
    * @return string
-   *   The path to the temporary file.
-   *
-   * @throws \Exception
-   *   If the file cannot be created.
+   *   The content without MIME headers.
    */
-  protected function createTempFile(string $content): string {
-    $tempFile = tempnam(sys_get_temp_dir(), 'encrypt_');
-    if ($tempFile === FALSE) {
-      throw new \Exception('Failed to create temporary file');
+  protected function stripMimeHeaders(string $content): string {
+    // Find the empty line that separates headers from content.
+    $parts = explode("\n\n", $content, 2);
+    if (count($parts) == 2) {
+      // Return only the content part.
+      return trim($parts[1]);
     }
-
-    if (file_put_contents($tempFile, $content) === FALSE) {
-      throw new \Exception('Failed to write to temporary file');
-    }
-
-    return $tempFile;
+    return $content;
   }
 
 }

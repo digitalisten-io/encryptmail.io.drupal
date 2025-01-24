@@ -61,14 +61,6 @@ class MailHandler {
     $config = $this->configFactory->get('encryptmailio.settings');
     $configs = $config->get('configs') ?: [];
 
-    // Ensure message body is an array.
-    if (is_string($message['body'])) {
-      $message['body'] = [$message['body']];
-    }
-    elseif (!is_array($message['body'])) {
-      $message['body'] = (array) $message['body'];
-    }
-
     foreach ($configs as $mail_config) {
       if ($message['to'] === $mail_config['email']) {
         try {
@@ -82,8 +74,15 @@ class MailHandler {
             $mail_config['type']
           );
 
-          // Convert back to array for SMTP module.
-          $message['body'] = explode("\n", $encrypted);
+          // Set the encrypted content as the message body.
+          $message['body'] = [$encrypted];
+
+          // Set headers for S/MIME.
+          if ($mail_config['type'] === 'smime') {
+            $message['headers']['Content-Type'] = 'application/x-pkcs7-mime; protocol="application/x-pkcs7-mime"; smimetype=enveloped-data; name="smime.p7m"';
+            $message['headers']['Content-Transfer-Encoding'] = 'base64';
+            $message['headers']['Content-Disposition'] = 'attachment; filename="smime.p7m"';
+          }
 
           // Obscure subject if configured.
           if (!empty($mail_config['obscure_subject'])) {
