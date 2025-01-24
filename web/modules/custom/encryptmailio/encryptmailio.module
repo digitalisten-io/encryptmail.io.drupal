@@ -30,3 +30,28 @@ function encryptmailio_page_attachments(array &$attachments): void {
     $attachments['#attached']['library'][] = 'encryptmailio/admin';
   }
 }
+
+/**
+ * Implements hook_theme().
+ */
+function encryptmailio_theme(): array {
+  return [
+    'encryptmailio_test_email' => [
+      'variables' => [
+        'subject' => NULL,
+        'body' => [],
+      ],
+      'template' => 'encryptmailio-test-email',
+    ],
+  ];
+}
+
+/**
+ * Implements hook_mail().
+ */
+function encryptmailio_mail($key, &$message, $params): void {
+  if ($key === 'test') {
+    $message['subject'] = $params['subject'];
+    $message['body'] = $params['body'];
+  }
+}

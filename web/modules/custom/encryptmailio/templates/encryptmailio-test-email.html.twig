@@ -1,0 +1,16 @@
+{#
+/**
+ * @file
+ * Default template for the EncryptMail.io test email.
+ *
+ * Available variables:
+ * - subject: The email subject.
+ * - body: An array of message body lines.
+ */
+#}
+<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+  <h2>{{ subject }}</h2>
+  {% for line in body %}
+    <p>{{ line }}</p>
+  {% endfor %}
+</div>

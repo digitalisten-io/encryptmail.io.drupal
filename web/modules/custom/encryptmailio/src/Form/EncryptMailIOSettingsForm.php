@@ -4,12 +4,40 @@ namespace Drupal\encryptmailio\Form;
 
 use Drupal\Core\Form\ConfigFormBase;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Mail\MailManagerInterface;
 use GuzzleHttp\Exception\RequestException;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
  * Configure EncryptMail.io settings.
  */
 class EncryptMailIOSettingsForm extends ConfigFormBase {
+
+  /**
+   * The mail manager.
+   *
+   * @var \Drupal\Core\Mail\MailManagerInterface
+   */
+  protected $mailManager;
+
+  /**
+   * Constructs a new EncryptMailIOSettingsForm.
+   *
+   * @param \Drupal\Core\Mail\MailManagerInterface $mail_manager
+   *   The mail manager.
+   */
+  public function __construct(MailManagerInterface $mail_manager) {
+    $this->mailManager = $mail_manager;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function create(ContainerInterface $container) {
+    return new static(
+      $container->get('plugin.manager.mail')
+    );
+  }
 
   /**
    * {@inheritdoc}
@@ -93,6 +121,40 @@ class EncryptMailIOSettingsForm extends ConfigFormBase {
       '#attributes' => [
         'class' => ['button--primary'],
       ],
+    ];
+
+    // Add test email section.
+    $form['test_email'] = [
+      '#type' => 'details',
+      '#title' => $this->t('Test Email'),
+      '#open' => TRUE,
+    ];
+
+    $form['test_email']['recipient'] = [
+      '#type' => 'email',
+      '#title' => $this->t('Recipient Email'),
+      '#description' => $this->t('Enter an email address to send a test message to.'),
+      '#required' => FALSE,
+    ];
+
+    $form['test_email']['send_test'] = [
+      '#type' => 'submit',
+      '#value' => $this->t('Send Test Email'),
+      '#submit' => ['::sendTestEmail'],
+      '#ajax' => [
+        'callback' => '::updateTestResult',
+        'wrapper' => 'test-result',
+        'effect' => 'fade',
+        'progress' => [
+          'type' => 'throbber',
+          'message' => $this->t('Sending test email...'),
+        ],
+      ],
+    ];
+
+    $form['test_email']['result'] = [
+      '#type' => 'markup',
+      '#markup' => '<div id="test-result"></div>',
     ];
 
     return parent::buildForm($form, $form_state);
@@ -241,6 +303,89 @@ class EncryptMailIOSettingsForm extends ConfigFormBase {
   public function updateConfigurations(array &$form, FormStateInterface $form_state): array {
     // Return the entire configs container with its wrapper.
     return $form['configs'];
+  }
+
+  /**
+   * Submit handler for sending test email.
+   */
+  public function sendTestEmail(array &$form, FormStateInterface $form_state): void {
+    $recipient = $form_state->getValue('recipient');
+
+    if (empty($recipient)) {
+      $form_state->setError($form['test_email']['recipient'], $this->t('Please enter a recipient email address.'));
+      return;
+    }
+
+    $params = [
+      'subject' => 'EncryptMail.io Test Email',
+      'body' => [
+        'This is a test email from your Drupal site using EncryptMail.io encryption.',
+        '',
+        'If you can read this message and it appears to be encrypted correctly, your email encryption is working properly.',
+        '',
+        'Sent: ' . date('Y-m-d H:i:s'),
+      ],
+    ];
+
+    try {
+      $result = $this->mailManager->mail(
+        'encryptmailio',
+        'test',
+        $recipient,
+        \Drupal::currentUser()->getPreferredLangcode(),
+        $params,
+        NULL,
+        TRUE
+      );
+
+      if ($result['result']) {
+        $this->messenger()->addStatus($this->t('Test email sent successfully to @email.', ['@email' => $recipient]));
+      }
+      else {
+        $this->messenger()->addError($this->t('Failed to send test email to @email.', ['@email' => $recipient]));
+      }
+    }
+    catch (\Exception $e) {
+      $this->messenger()->addError($this->t('Error sending test email: @error', ['@error' => $e->getMessage()]));
+    }
+  }
+
+  /**
+   * Ajax callback for updating test result.
+   */
+  public function updateTestResult(array &$form, FormStateInterface $form_state): array {
+    $messenger = \Drupal::messenger();
+    $output = [];
+
+    // Get all message types.
+    $message_types = ['status', 'warning', 'error'];
+
+    foreach ($message_types as $type) {
+      $messages = $messenger->messagesByType($type);
+      foreach ($messages as $message) {
+        $class = match ($type) {
+          'status' => 'valid',
+          'error' => 'invalid',
+          default => 'error',
+        };
+
+        $output[] = [
+          '#type' => 'html_tag',
+          '#tag' => 'div',
+          '#value' => $message,
+          '#attributes' => [
+            'class' => ['api-status', $class],
+          ],
+        ];
+      }
+    }
+
+    $messenger->deleteAll();
+
+    return [
+      '#type' => 'container',
+      'messages' => $output,
+    ];
   }
 
   /**
