@@ -1,0 +1,7 @@
+encryptmailio.settings:
+  path: '/admin/config/system/encryptmailio'
+  defaults:
+    _form: '\Drupal\encryptmailio\Form\EncryptMailIOSettingsForm'
+    _title: 'EncryptMail.io Settings'
+  requirements:
+    _permission: 'administer encryptmailio'

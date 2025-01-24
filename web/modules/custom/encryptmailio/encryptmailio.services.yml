@@ -1,0 +1,8 @@
+services:
+  encryptmailio.encryptor:
+    class: Drupal\encryptmailio\Service\Encryptor
+    arguments: ['@logger.factory']
+
+  encryptmailio.mail_handler:
+    class: Drupal\encryptmailio\Service\MailHandler
+    arguments: ['@config.factory', '@encryptmailio.encryptor', '@logger.factory']

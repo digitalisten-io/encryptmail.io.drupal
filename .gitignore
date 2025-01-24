@@ -1,0 +1,49 @@
+# Ignore Drupal core and contrib
+/web/core
+/web/modules/contrib
+/web/themes/contrib
+/web/profiles/contrib
+/web/libraries
+
+# Ignore configuration files that may contain sensitive information
+/web/sites/*/settings*.php
+/web/sites/*/services*.yml
+
+# Ignore paths that may contain user-generated content
+/web/sites/*/files
+/web/sites/*/private
+
+# Ignore SimpleTest multi-site environment
+/web/sites/simpletest
+
+# Ignore vendor dependencies and scripts
+/vendor
+/composer.phar
+
+# Ignore node modules
+/node_modules
+
+# Ignore compiled CSS, JavaScript, and other generated assets
+/web/sites/*/files/css
+/web/sites/*/files/js
+/web/sites/*/files/php
+
+# Ignore .env files which might contain sensitive data
+.env
+.env.local
+.env.*.local
+
+# Ignore system files
+.DS_Store
+Thumbs.db
+
+# Ignore IDE specific files
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# Ignore log files and databases
+*.log
+*.sql
+*.sqlite

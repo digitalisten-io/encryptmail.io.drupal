@@ -1,0 +1,81 @@
+.email-config {
+  margin-bottom: 15px;
+  padding: 10px;
+  border: 1px solid #ccc;
+  background: #f9f9f9;
+}
+
+.email-config input[type="email"] {
+  width: 250px;
+  margin-right: 10px;
+}
+
+.email-config select {
+  margin-right: 10px;
+}
+
+.email-config textarea {
+  width: 100%;
+  margin-top: 10px;
+}
+
+.obscure-subject {
+  margin: 10px 0;
+}
+
+.obscure-subject label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.button--danger {
+  color: #dc3232;
+}
+
+#test-result {
+  margin-left: 10px;
+  padding: 5px 10px;
+}
+
+.ruler {
+  border-top: 2px solid #ccc;
+  margin: 20px 0;
+}
+
+.api-status {
+  display: inline-block;
+  padding: 4px 8px;
+  margin-left: 10px;
+  border-radius: 3px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.api-status.valid {
+  background: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+.api-status.invalid {
+  background: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
+
+.api-status.error {
+  background: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffeeba;
+}
+
+#test-api-key {
+  margin-left: 10px;
+  margin-right: 10px;
+}
+
+#api-key-result {
+  display: inline-block;
+  vertical-align: middle;
+}

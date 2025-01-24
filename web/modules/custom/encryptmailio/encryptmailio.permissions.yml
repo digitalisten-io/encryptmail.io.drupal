@@ -1,0 +1,4 @@
+administer encryptmailio:
+  title: 'Administer EncryptMail.io settings'
+  description: 'Configure email encryption settings and API keys'
+  restrict access: true

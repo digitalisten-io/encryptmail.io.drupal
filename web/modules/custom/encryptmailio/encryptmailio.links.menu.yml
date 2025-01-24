@@ -1,0 +1,6 @@
+encryptmailio.settings:
+  title: 'EncryptMail.io'
+  description: 'Configure email encryption settings'
+  parent: system.admin_config_system
+  route_name: encryptmailio.settings
+  weight: 100

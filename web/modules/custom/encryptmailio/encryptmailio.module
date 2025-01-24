@@ -1,0 +1,32 @@
+<?php
+
+/**
+ * @file
+ * Contains EncryptMail.io module functionality.
+ */
+
+declare(strict_types=1);
+
+/**
+ * @file
+ * Primary module hooks for EncryptMail.io module.
+ */
+
+/**
+ * Implements hook_mail_alter().
+ */
+function encryptmailio_mail_alter(array &$message): void {
+  /** @var \Drupal\encryptmailio\Service\MailHandler $handler */
+  $handler = \Drupal::service('encryptmailio.mail_handler');
+  $handler->alterMessage($message);
+}
+
+/**
+ * Implements hook_page_attachments().
+ */
+function encryptmailio_page_attachments(array &$attachments): void {
+  $route_name = \Drupal::routeMatch()->getRouteName();
+  if ($route_name === 'encryptmailio.settings') {
+    $attachments['#attached']['library'][] = 'encryptmailio/admin';
+  }
+}
