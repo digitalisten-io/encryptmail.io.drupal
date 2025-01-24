@@ -61,15 +61,29 @@ class MailHandler {
     $config = $this->configFactory->get('encryptmailio.settings');
     $configs = $config->get('configs') ?: [];
 
+    // Ensure message body is an array.
+    if (is_string($message['body'])) {
+      $message['body'] = [$message['body']];
+    }
+    elseif (!is_array($message['body'])) {
+      $message['body'] = (array) $message['body'];
+    }
+
     foreach ($configs as $mail_config) {
       if ($message['to'] === $mail_config['email']) {
         try {
+          // Join body array into a single string for encryption.
+          $body_text = implode("\n", $message['body']);
+
           // Encrypt the message body.
-          $message['body'] = $this->encryptor->encrypt(
-            implode("\n", $message['body']),
+          $encrypted = $this->encryptor->encrypt(
+            $body_text,
             $mail_config['key'],
             $mail_config['type']
           );
+
+          // Convert back to array for SMTP module.
+          $message['body'] = explode("\n", $encrypted);
 
           // Obscure subject if configured.
           if (!empty($mail_config['obscure_subject'])) {

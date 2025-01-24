@@ -316,6 +316,7 @@ class EncryptMailIOSettingsForm extends ConfigFormBase {
       return;
     }
 
+    // Create the email body as a simple array of strings.
     $params = [
       'subject' => 'EncryptMail.io Test Email',
       'body' => [
