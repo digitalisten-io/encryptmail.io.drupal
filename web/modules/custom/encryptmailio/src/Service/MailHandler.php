@@ -58,14 +58,37 @@ class MailHandler {
    *   The message array to alter.
    */
   public function alterMessage(array &$message): void {
+    $this->loggerFactory->get('encryptmailio')->info(
+      'Processing mail message to: @to',
+      ['@to' => $message['to']]
+    );
+
     $config = $this->configFactory->get('encryptmailio.settings');
     $configs = $config->get('configs') ?: [];
 
+    $this->loggerFactory->get('encryptmailio')->debug(
+      'Found @count encryption configurations',
+      ['@count' => count($configs)]
+    );
+
     foreach ($configs as $mail_config) {
       if ($message['to'] === $mail_config['email']) {
+        $this->loggerFactory->get('encryptmailio')->info(
+          'Found matching configuration for @email using @type encryption',
+          [
+            '@email' => $mail_config['email'],
+            '@type' => $mail_config['type'],
+          ]
+        );
+
         try {
           // Join body array into a single string for encryption.
           $body_text = implode("\n", $message['body']);
+
+          $this->loggerFactory->get('encryptmailio')->debug(
+            'Preparing to encrypt message body of length: @length',
+            ['@length' => strlen($body_text)]
+          );
 
           // Encrypt the message body.
           $encrypted = $this->encryptor->encrypt(
@@ -74,19 +97,34 @@ class MailHandler {
             $mail_config['type']
           );
 
+          $this->loggerFactory->get('encryptmailio')->debug(
+            'Message encrypted successfully, encrypted length: @length',
+            ['@length' => strlen($encrypted)]
+          );
+
           // Set the encrypted content as the message body.
           $message['body'] = [$encrypted];
 
           // Set headers for S/MIME.
           if ($mail_config['type'] === 'smime') {
-            $message['headers']['Content-Type'] = 'application/x-pkcs7-mime; protocol="application/x-pkcs7-mime"; smimetype=enveloped-data; name="smime.p7m"';
+            // Set PHPMailer compatible headers.
+            $message['headers']['Content-Type'] = 'application/pkcs7-mime; smimetype=enveloped-data; name=smime.p7m';
             $message['headers']['Content-Transfer-Encoding'] = 'base64';
-            $message['headers']['Content-Disposition'] = 'attachment; filename="smime.p7m"';
+            $message['headers']['Content-Disposition'] = 'attachment; filename=smime.p7m';
+            // Add MIME version header.
+            $message['headers']['MIME-Version'] = '1.0';
+
+            $this->loggerFactory->get('encryptmailio')->debug('Added S/MIME headers to message');
+            $this->loggerFactory->get('encryptmailio')->debug(
+              'Content-Type header: @type',
+              ['@type' => $message['headers']['Content-Type']]
+            );
           }
 
           // Obscure subject if configured.
           if (!empty($mail_config['obscure_subject'])) {
             $message['subject'] = '[Encrypted] ' . $message['subject'];
+            $this->loggerFactory->get('encryptmailio')->debug('Subject obscured as configured');
           }
 
           $this->loggerFactory->get('encryptmailio')->info(
@@ -106,6 +144,8 @@ class MailHandler {
         break;
       }
     }
+
+    $this->loggerFactory->get('encryptmailio')->debug('Mail message processing completed');
   }
 
 }

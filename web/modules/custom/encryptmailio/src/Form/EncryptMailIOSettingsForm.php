@@ -59,6 +59,20 @@ class EncryptMailIOSettingsForm extends ConfigFormBase {
   public function buildForm(array $form, FormStateInterface $form_state) {
     $config = $this->config('encryptmailio.settings');
 
+    // Add GnuPG extension check warning.
+    if (!extension_loaded('gnupg') || !class_exists('GnuPG')) {
+      $form['gnupg_warning'] = [
+        '#type' => 'container',
+        '#attributes' => [
+          'class' => ['messages', 'messages--warning'],
+        ],
+        'message' => [
+          '#markup' => $this->t('The GnuPG PHP extension is not installed or not properly configured. PGP encryption will not be available until this extension is installed and enabled.'),
+        ],
+        '#weight' => -100,
+      ];
+    }
+
     $form['api_key'] = [
       '#type' => 'textfield',
       '#title' => $this->t('API Key'),
