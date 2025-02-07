@@ -102,23 +102,30 @@ class MailHandler {
             ['@length' => strlen($encrypted)]
           );
 
-          // Set the encrypted content as the message body.
-          $message['body'] = [$encrypted];
-
-          // Set headers for S/MIME.
           if ($mail_config['type'] === 'smime') {
-            // Set PHPMailer compatible headers.
-            $message['headers']['Content-Type'] = 'application/pkcs7-mime; smimetype=enveloped-data; name=smime.p7m';
-            $message['headers']['Content-Transfer-Encoding'] = 'base64';
-            $message['headers']['Content-Disposition'] = 'attachment; filename=smime.p7m';
-            // Add MIME version header.
-            $message['headers']['MIME-Version'] = '1.0';
+            // Set up S/MIME specific parameters.
+            $message['params']['smime'] = TRUE;
 
-            $this->loggerFactory->get('encryptmailio')->debug('Added S/MIME headers to message');
-            $this->loggerFactory->get('encryptmailio')->debug(
-              'Content-Type header: @type',
-              ['@type' => $message['headers']['Content-Type']]
-            );
+            // Set the encrypted content as the body.
+            $message['body'] = [base64_encode($encrypted)];
+
+            // Set minimal headers to avoid conflicts.
+            $message['headers'] = [
+              'MIME-Version' => '1.0',
+              'Content-Type' => 'application/x-pkcs7-mime; smimetype=enveloped-data; name=smime.p7m',
+              'Content-Transfer-Encoding' => 'base64',
+              'Content-Disposition' => 'attachment; filename="smime.p7m"',
+            ];
+
+            $this->loggerFactory->get('encryptmailio')->debug('Added S/MIME parameters');
+          }
+          elseif ($mail_config['type'] === 'pgp') {
+            $message['headers'] = [
+              'MIME-Version' => '1.0',
+              'Content-Type' => 'text/plain; charset=utf-8',
+              'Content-Transfer-Encoding' => '7bit',
+            ];
+            $message['body'] = [$encrypted];
           }
 
           // Obscure subject if configured.

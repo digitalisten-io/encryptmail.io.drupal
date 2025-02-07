@@ -5,7 +5,13 @@ namespace Drupal\encryptmailio\Service;
 use Drupal\Core\Logger\LoggerChannelFactoryInterface;
 
 /**
+ * @phpstan-type GnuPG class-string<\GnuPG>
+ */
+
+/**
  * Provides encryption functionality for emails.
+ *
+ * This service handles both S/MIME and PGP encryption methods.
  */
 class Encryptor {
 
@@ -121,19 +127,9 @@ class Encryptor {
         throw new \Exception('Invalid certificate: ' . $error);
       }
 
-      $this->loggerFactory->get('encryptmailio')->debug('Certificate validated successfully');
-
       // Create temporary files.
       $infile = tempnam(sys_get_temp_dir(), 'msg');
       $outfile = tempnam(sys_get_temp_dir(), 'enc');
-
-      $this->loggerFactory->get('encryptmailio')->debug(
-        'Created temporary files: @in, @out',
-        [
-          '@in' => $infile,
-          '@out' => $outfile,
-        ]
-      );
 
       // Write message to temporary file.
       file_put_contents($infile, $message);
@@ -145,8 +141,8 @@ class Encryptor {
         $certificate,
       // Empty headers array.
         [],
-      // Use binary encoding.
-        PKCS7_BINARY,
+      // No flags - let PHPMailer handle the MIME structure.
+        0,
         OPENSSL_CIPHER_AES_256_CBC
       );
 
@@ -159,37 +155,15 @@ class Encryptor {
         throw new \Exception('Encryption failed: ' . $error);
       }
 
-      $this->loggerFactory->get('encryptmailio')->debug('S/MIME encryption completed successfully');
-
       // Read encrypted content.
       $encrypted = file_get_contents($outfile);
-      if ($encrypted === FALSE) {
-        throw new \Exception('Failed to read encrypted content');
-      }
-
-      $this->loggerFactory->get('encryptmailio')->debug(
-        'Read encrypted content, length: @length',
-        ['@length' => strlen($encrypted)]
-      );
 
       // Clean up.
       unlink($infile);
       unlink($outfile);
-      if ($cert) {
-        // PHP 8.0+ doesn't require explicit freeing of the certificate.
-        if (version_compare(PHP_VERSION, '8.0.0', '<')) {
-          @openssl_x509_free($cert);
-        }
-      }
 
-      // Return base64 encoded encrypted content.
-      $encoded = base64_encode($encrypted);
-      $this->loggerFactory->get('encryptmailio')->debug(
-        'Returning base64 encoded content, length: @length',
-        ['@length' => strlen($encoded)]
-      );
-
-      return $encoded;
+      // Return raw encrypted content.
+      return $encrypted;
     }
     catch (\Exception $e) {
       $this->loggerFactory->get('encryptmailio')->error(
@@ -256,6 +230,7 @@ class Encryptor {
       // Clear the encryption keys.
       $this->gnupg->clearencryptkeys();
 
+      // Return the encrypted message directly since GnuPG already adds the markers.
       return $encrypted;
     }
     catch (\Exception $e) {

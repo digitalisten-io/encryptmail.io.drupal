@@ -20,6 +20,7 @@
         "drupal/core-composer-scaffold": "^11.0",
         "drupal/core-project-message": "^11.0",
         "drupal/core-recommended": "^11.0",
+        "drupal/phpmailer_smtp": "^2.2",
         "drupal/smtp": "^1.4",
         "drush/drush": "^13.3"
     },

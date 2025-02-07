@@ -4,3 +4,5 @@ description: 'Encrypts outgoing Drupal emails using S/MIME or PGP'
 package: Mail
 core_version_requirement: ^9 || ^10 || ^11
 configure: encryptmailio.settings
+dependencies:
+  - phpmailer_smtp:phpmailer_smtp

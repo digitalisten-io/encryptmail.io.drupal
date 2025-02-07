@@ -1,0 +1,38 @@
+<?php
+
+/**
+ * @file
+ * Install, update and uninstall functions for the EncryptMail.io module.
+ */
+
+/**
+ * Implements hook_install().
+ */
+function encryptmailio_install() {
+  // Set our mailer as the default mail system.
+  \Drupal::configFactory()
+    ->getEditable('system.mail')
+    ->set('interface.default', 'encryptmailio_mailer')
+    ->save();
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function encryptmailio_uninstall() {
+  // Restore the default mail system.
+  \Drupal::configFactory()
+    ->getEditable('system.mail')
+    ->set('interface.default', 'phpmailer_smtp')
+    ->save();
+}
+
+/**
+ * Updates mail system configuration to use encryptmailio_mailer.
+ */
+function encryptmailio_update_9001() {
+  \Drupal::configFactory()
+    ->getEditable('system.mail')
+    ->set('interface.default', 'encryptmailio_mailer')
+    ->save();
+}
